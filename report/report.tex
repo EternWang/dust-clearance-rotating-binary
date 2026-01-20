@@ -1,0 +1,95 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{siunitx}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{caption}
+\usepackage{float}
+\usepackage{setspace}
+\setstretch{1.05}
+
+\title{\textbf{Dust Clearance in a Rotating Binary}:\\
+\textbf{Test-Particle Simulation of Resonance-Driven Gaps}}
+\author{Hongyu Wang\\Department of Physics, University of California, Santa Barbara\\Instructor: David Berenstein}
+\date{June 4, 2024}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Mean-motion resonances in multi-body gravitational systems can destabilize orbits and carve ``gaps'' in a particulate disk (e.g., Kirkwood gaps in the asteroid belt).
+We simulate a simplified rotating-binary system (two primaries on a fixed circular orbit) and integrate thousands of test particles (``dust'') to identify which initial orbital radii are stable versus cleared.
+Using a fourth-order Runge--Kutta (RK4) integrator in nondimensional units ($G=1$, $M_1=1$, $M_2=3$, separation $D=1$), we evolve particles for $t\approx\SI{40}{(time\ units)}$ and classify escape by a radial threshold.
+We find a non-uniform survival probability versus initial radius, consistent with resonance-driven clearing.
+\end{abstract}
+
+\section{Model}
+We consider two primaries of masses $M_1$ and $M_2$ separated by a fixed distance $D$ and moving on circular orbits about the center of mass.
+We work in nondimensional units with gravitational constant $G=1$.
+The binary's angular speed is
+\begin{equation}
+\omega = \sqrt{\frac{G(M_1+M_2)}{D^3}}.
+\end{equation}
+At time $t$, the primary positions are
+\begin{align}
+\mathbf{s}_1(t) &= -\frac{M_2}{M_1+M_2}D\,[\cos(\omega t),\,\sin(\omega t)],\\
+\mathbf{s}_2(t) &= +\frac{M_1}{M_1+M_2}D\,[\cos(\omega t),\,\sin(\omega t)].
+\end{align}
+A test particle at position $\mathbf{r}(t)$ obeys
+\begin{equation}
+\ddot{\mathbf{r}} = G\,M_1\,\frac{\mathbf{s}_1(t)-\mathbf{r}}{|\mathbf{s}_1(t)-\mathbf{r}|^3} + G\,M_2\,\frac{\mathbf{s}_2(t)-\mathbf{r}}{|\mathbf{s}_2(t)-\mathbf{r}|^3}.
+\end{equation}
+To avoid numerical singularities during close approaches, we use a small distance ``softening'' $\epsilon$ by clamping $|\mathbf{s}-\mathbf{r}|\ge\epsilon$.
+
+\section{Numerical methods}
+\subsection{Initial conditions}
+We draw $N$ particles with initial radius $r_0\sim\mathcal{U}(r_{\min}, r_{\max})$ and random orbital phase.
+Initial velocities are set to an approximate Keplerian speed about the total mass $M_1+M_2$,
+\begin{equation}
+ v_{\mathrm{kep}}(r_0)=\sqrt{\frac{G(M_1+M_2)}{r_0}},
+\end{equation}
+with small Gaussian noise to break perfect symmetry.
+
+\subsection{Integrator and escape criterion}
+We integrate all particles with a fixed-step RK4 scheme using step size $\Delta t$ for a total of $N_{\mathrm{steps}}$ steps.
+A particle is marked as ``escaped'' if its distance from the center of mass exceeds a threshold $r>r_{\max,\mathrm{esc}}$ at any step.
+All simulation parameters (including random seed) are recorded in the output file for reproducibility.
+
+\section{Results}
+Figure~\ref{fig:survival} shows the survival fraction as a function of initial orbital radius.
+A smooth gravitational potential would yield a relatively flat survival probability; in contrast, we observe structure (dips) that is consistent with resonant destabilization.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.92\linewidth]{../figures/survival_fraction_vs_initial_radius.png}
+  \caption{Fraction of particles surviving (not escaping beyond a threshold radius) versus initial orbital radius.}
+  \label{fig:survival}
+\end{figure}
+
+Figure~\ref{fig:rot} plots final particle positions in the co-rotating frame, where the primaries are approximately stationary on the $x$-axis.
+Persistent structure in this frame indicates long-lived orbital families, while depleted regions indicate clearing.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.85\linewidth]{../figures/final_positions_rotating_frame.png}
+  \caption{Final dust positions in the rotating frame (survivors only). Crosses mark the primary masses at their $t=0$ positions.}
+  \label{fig:rot}
+\end{figure}
+
+\section{Discussion}
+This simplified model reproduces a key qualitative phenomenon: gravitational resonances can preferentially remove particles from certain radii, producing gaps and overdensities.
+In a more realistic disk, additional physics---collisions, gas drag, radiation pressure, and a spectrum of particle sizes---would modify both the clearing timescale and the detailed structure.
+Numerically, fixed-step RK4 is adequate for qualitative behavior over modest integration times, but high-eccentricity encounters can benefit from adaptive timesteps or symplectic integrators.
+
+\section{Reproducibility}
+All figures in this report are reproducible from the code in \texttt{src/}.
+A minimal workflow is:
+\begin{verbatim}
+python src/simulate_dust.py --n_particles 2000 --steps 2000 --dt 0.02 --seed 42
+python src/make_figures.py
+\end{verbatim}
+See \texttt{README.md} for details.
+
+\end{document}

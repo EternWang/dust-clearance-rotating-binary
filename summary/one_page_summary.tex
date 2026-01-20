@@ -1,0 +1,44 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{siunitx}
+\usepackage{enumitem}
+\pagenumbering{gobble}
+\begin{document}
+\begin{center}
+{\LARGE \textbf{Dust Clearance in a Rotating Binary (in plain English)}}\\[0.4em]
+{\large Hongyu Wang (UCSB Physics) \quad|\quad Instructor: David Berenstein}
+\end{center}
+
+\vspace{0.6em}
+\textbf{What is the idea?} In space, small objects (dust, asteroids) orbit bigger bodies.
+When there is more than one big body (e.g., a star + a massive planet), gravity can create \emph{resonances}: repeated ``kicks'' that make some orbits unstable.
+Over time, unstable orbits get emptied, producing \emph{gaps} in the dust distribution.
+
+\vspace{0.6em}
+\textbf{What did we simulate?}
+\begin{itemize}[leftmargin=*]
+  \item Two massive objects orbit each other on a circular orbit (a simplified ``binary'').
+  \item Thousands of massless test particles (``dust'') start on random circular-ish orbits.
+  \item We numerically integrate Newton's law of gravity and see which particles stay near the system versus get thrown out.
+\end{itemize}
+
+\textbf{What did we find?}
+\begin{itemize}[leftmargin=*]
+  \item The fraction of particles that survive depends strongly on their starting radius.
+  \item Some radii are ``danger zones'' where resonant kicks make particles escape more often.
+  \item When plotted in a frame rotating with the binary, the remaining dust shows clear structure instead of a uniform cloud.
+\end{itemize}
+
+\textbf{Why does this matter?}
+\begin{itemize}[leftmargin=*]
+  \item The same physics explains real astrophysical patterns (e.g., Kirkwood gaps in the asteroid belt).
+  \item Even a simple model reproduces the qualitative idea: gravity can sculpt disks into rings and gaps.
+\end{itemize}
+
+\textbf{Reproducible code.} This repo contains the full simulation and plotting code. To reproduce the figures:
+\begin{center}
+\texttt{python src/simulate\_dust.py}\\
+\texttt{python src/make\_figures.py}
+\end{center}
+
+\end{document}
