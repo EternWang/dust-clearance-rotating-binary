@@ -1,6 +1,6 @@
 # Dust Clearance in a Rotating Binary (UCSB Physics)
 
-**Author:** Hongyu，, Alex, Kuntong, Shibiao, Zhe 
+**Author:** Hongyu, Alex, Kuntong, Shibiao, Zhe 
 **Instructor:** David Berenstein  
 **Date:** June 4, 2024
 
