@@ -23,8 +23,26 @@ def rotation_matrix(angle: float) -> np.ndarray:
     return np.array([[c, -s], [s, c]])
 
 
-def omega(G: float, M1: float, M2: float, D: float) -> float:
-    return float(np.sqrt(G * (M1 + M2) / D**3))
+def barycenter(star1_pos: np.ndarray, star2_pos: np.ndarray, M1: float, M2: float) -> np.ndarray:
+    return (M1 * star1_pos + M2 * star2_pos) / (M1 + M2)
+
+
+def to_rotating_frame(
+    points: np.ndarray,
+    star1_pos: np.ndarray,
+    star2_pos: np.ndarray,
+    M1: float,
+    M2: float,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Rotate coordinates so the instantaneous binary axis lies on the x-axis."""
+    com = barycenter(star1_pos, star2_pos, M1, M2)
+    axis = star2_pos - star1_pos
+    angle = float(np.arctan2(axis[1], axis[0]))
+    rotation = rotation_matrix(-angle)
+    points_rot = (rotation @ (points - com).T).T
+    star1_rot = rotation @ (star1_pos - com)
+    star2_rot = rotation @ (star2_pos - com)
+    return points_rot, star1_rot, star2_rot
 
 
 def radial_diagnostics(
@@ -82,6 +100,9 @@ def write_analysis_products(
     survived: np.ndarray,
     escaped_at_step: np.ndarray,
     dt: float,
+    M1: float,
+    M2: float,
+    binary_separation: np.ndarray,
 ) -> None:
     """Write CSV and JSON summaries for downstream use in README/reporting."""
     csv_path = OUTPUT_DIR / "radial_diagnostics.csv"
@@ -130,10 +151,13 @@ def write_analysis_products(
 
     escaped_times = escaped_at_step[escaped_at_step >= 0] * dt
     summary = {
+        "mass_ratio_M1_over_M2": float(M1 / M2),
         "overall_survival_fraction": float(survived.mean()),
         "escaped_fraction": float((~survived).mean()),
         "escaped_particles": int((~survived).sum()),
         "surviving_particles": int(survived.sum()),
+        "mean_binary_separation": float(np.mean(binary_separation)),
+        "binary_separation_std": float(np.std(binary_separation)),
         "median_escape_time": (
             float(np.median(escaped_times)) if len(escaped_times) else None
         ),
@@ -160,19 +184,20 @@ def main() -> None:
     final_pos = dat["final_pos"]
     survived = dat["survived"]
     escaped_at_step = dat["escaped_at_step"]
+    history_star1_pos = dat["history_star1_pos"]
+    history_star2_pos = dat["history_star2_pos"]
+    final_star1_pos = dat["final_star1_pos"]
+    final_star2_pos = dat["final_star2_pos"]
     t_end = float(dat["t_end"])
     dt = float(dat["dt"])
 
-    G = float(dat["G"])
     M1 = float(dat["M1"])
     M2 = float(dat["M2"])
-    D = float(dat["D"])
     max_radius = float(dat["max_radius"])
-
-    w = omega(G, M1, M2, D)
     centers, survival_fraction, escaped_count, median_escape_time, escape_band = radial_diagnostics(
         r0, survived, escaped_at_step, dt
     )
+    binary_separation = np.linalg.norm(history_star2_pos - history_star1_pos, axis=1)
 
     write_analysis_products(
         centers,
@@ -183,6 +208,9 @@ def main() -> None:
         survived,
         escaped_at_step,
         dt,
+        M1,
+        M2,
+        binary_separation,
     )
 
     # Figure 1: original survival curve, kept for continuity with the report.
@@ -227,12 +255,9 @@ def main() -> None:
     plt.close(fig2)
 
     # Figure 3: final positions in the co-rotating frame.
-    R = rotation_matrix(-w * t_end)
-    final_rot = (R @ final_pos.T).T
-    r1 = D * M2 / (M1 + M2)
-    r2 = D * M1 / (M1 + M2)
-    s1 = np.array([-r1, 0.0])
-    s2 = np.array([+r2, 0.0])
+    final_rot, star1_rot, star2_rot = to_rotating_frame(
+        final_pos, final_star1_pos, final_star2_pos, M1, M2
+    )
 
     fig3 = plt.figure(figsize=(6.6, 6.6))
     ax4 = fig3.add_subplot(111)
@@ -252,11 +277,18 @@ def main() -> None:
         color="#1f77b4",
         label="survivors",
     )
-    ax4.scatter([s1[0], s2[0]], [s1[1], s2[1]], marker="x", s=90, color="black", label="primaries")
+    ax4.scatter(
+        [star1_rot[0], star2_rot[0]],
+        [star1_rot[1], star2_rot[1]],
+        marker="x",
+        s=[140, 90],
+        color="black",
+        label="primaries",
+    )
     ax4.set_xlim(-max_radius, max_radius)
     ax4.set_ylim(-max_radius, max_radius)
     ax4.set_aspect("equal", adjustable="box")
-    ax4.set_title("Final dust positions in the rotating frame")
+    ax4.set_title("Final dust positions in the instantaneous rotating frame")
     ax4.set_xlabel("x (rotating frame)")
     ax4.set_ylabel("y (rotating frame)")
     ax4.grid(True, alpha=0.25)

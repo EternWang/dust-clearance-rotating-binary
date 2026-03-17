@@ -4,18 +4,28 @@ A reproducible Python project built from a UCSB physics final project on
 **resonance-driven dust clearing** in a rotating binary system.
 
 This repository is structured as a small simulation-and-analysis codebase rather
-than a report dump: it generates the raw simulation output, derives binned
-stability diagnostics, and exports both static figures and a GitHub-friendly
-animation.
+than a report dump: it integrates the binary and dust with RK4, generates the
+raw simulation output, derives binned stability diagnostics, and exports both
+static figures and a GitHub-friendly animation.
 
 ## What this repository demonstrates
 
 - vectorized **NumPy** simulation of thousands of test particles
-- a custom fixed-step **RK4** integrator for a time-dependent gravitational field
+- a custom fixed-step **RK4** integrator for a coupled binary-plus-dust system
 - derived **data products** (`CSV` and `JSON`) from simulation output
 - scientific visualization with **matplotlib**
 - animated result generation for a portfolio-ready **README GIF**
 - a reproducible workflow that connects code, figures, and report artifacts
+
+## Physical model
+
+- Two primaries are included in the dynamical state and move under their
+  **mutual gravitational attraction**
+- Dust particles are treated as **massless tracers**
+- Dust feels the gravity of both primaries, but the dust does **not** back-react
+  on the binary
+- Default mass ratio: **`M1:M2 = 3:1`**
+- Initial binary separation: **`D = 1`** in nondimensional units
 
 ## Key results
 
@@ -23,24 +33,56 @@ For the default run (`n_particles=2000`, `steps=2000`, `dt=0.02`, `seed=42`):
 
 | Quantity | Result |
 |---|---:|
+| Mass ratio | `M1/M2 = 3.0` |
 | Particles simulated | `2000` |
-| Surviving particles at `t_end` | `461` |
-| Escaped particles at `t_end` | `1539` |
-| Overall survival fraction | `0.2305` |
-| Median escape time | `4.86` |
-| Most unstable initial radius bin | `r0 ~= 1.749` |
-| Minimum survival fraction | `0.0189` |
+| Surviving particles at `t_end` | `479` |
+| Escaped particles at `t_end` | `1521` |
+| Overall survival fraction | `0.2395` |
+| Median escape time | `4.76` |
+| Most unstable initial radius bin | `r0 ~= 1.711` |
+| Minimum survival fraction | `0.0000` |
+| Mean binary separation | `0.99999985` |
+| Binary separation std. dev. | `7.33e-08` |
 
 Interpretation:
 
 - Stability depends strongly on the particle's **initial orbital radius**
-- The deepest depletion in this run occurs near **`r0 ~= 1.75`**
+- The deepest depletion in this run occurs near **`r0 ~= 1.71`**
 - The system shows **radial "danger zones"** consistent with resonance-driven clearing
+- The binary separation stays essentially fixed, which is what we expect for a
+  correctly initialized circular two-body orbit integrated with a small RK4 step
+
+## Why RK4 here?
+
+This project uses a classic fourth-order Runge-Kutta step to update the
+positions and velocities of:
+
+- primary 1
+- primary 2
+- every dust particle
+
+At each timestep, RK4 evaluates the derivatives four times:
+
+```text
+k1 = f(y_n)
+k2 = f(y_n + 0.5 dt k1)
+k3 = f(y_n + 0.5 dt k2)
+k4 = f(y_n + dt k3)
+
+y_{n+1} = y_n + (dt/6) (k1 + 2k2 + 2k3 + k4)
+```
+
+Why it helps here:
+
+- it is much more accurate than a simple Euler update at the same timestep
+- it handles the time-dependent gravitational field from the moving primaries well
+- it is still easy to read and explain in a portfolio project
 
 ## Orbit evolution (README animation)
 
 The animation below is generated from downsampled trajectory snapshots saved by
-the simulation and rendered in the co-rotating frame.
+the RK4 integrator. Unlike the earlier fixed-orbit version of the project, both
+primaries now move explicitly in the animation.
 
 ![Orbit evolution GIF](figures/orbit_evolution.gif)
 
@@ -120,3 +162,7 @@ Generated assets are written to:
 This repository is adapted from a UCSB physics course final project. The goal of
 the GitHub version is to present the work as a **reproducible numerical-analysis
 project** with clear data products, visual diagnostics, and readable Python.
+
+The PDF in `report/` is the original course artifact. The GitHub version of the
+project extends that baseline by integrating the binary self-consistently with
+RK4 and by adding analysis products and animation assets for portfolio use.

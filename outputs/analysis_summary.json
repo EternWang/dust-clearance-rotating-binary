@@ -1,9 +1,12 @@
 {
-  "overall_survival_fraction": 0.2305,
-  "escaped_fraction": 0.7695,
-  "escaped_particles": 1539,
-  "surviving_particles": 461,
-  "median_escape_time": 4.86,
-  "most_unstable_radius_center": 1.7494070725716613,
-  "minimum_survival_fraction": 0.018867924528301886
+  "mass_ratio_M1_over_M2": 3.0,
+  "overall_survival_fraction": 0.2395,
+  "escaped_fraction": 0.7605,
+  "escaped_particles": 1521,
+  "surviving_particles": 479,
+  "mean_binary_separation": 0.9999998459372332,
+  "binary_separation_std": 7.330903430494464e-08,
+  "median_escape_time": 4.76,
+  "most_unstable_radius_center": 1.710987720069412,
+  "minimum_survival_fraction": 0.0
 }

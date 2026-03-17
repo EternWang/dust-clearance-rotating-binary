@@ -6,22 +6,13 @@ import argparse
 from pathlib import Path
 
 import matplotlib.pyplot as plt
-import numpy as np
 from matplotlib.animation import FuncAnimation, PillowWriter
+import numpy as np
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 NPZ_PATH = REPO_ROOT / "outputs" / "sim_results.npz"
 GIF_PATH = REPO_ROOT / "figures" / "orbit_evolution.gif"
-
-
-def rotation_matrix(angle: float) -> np.ndarray:
-    c, s = np.cos(angle), np.sin(angle)
-    return np.array([[c, -s], [s, c]])
-
-
-def omega(G: float, M1: float, M2: float, D: float) -> float:
-    return float(np.sqrt(G * (M1 + M2) / D**3))
 
 
 def parse_args() -> argparse.Namespace:
@@ -47,14 +38,14 @@ def main() -> None:
         )
 
     history_pos = dat["history_pos"]
+    history_star1_pos = dat["history_star1_pos"]
+    history_star2_pos = dat["history_star2_pos"]
     history_times = dat["history_times"]
     history_steps = dat["history_steps"]
     escaped_at_step = dat["escaped_at_step"]
 
-    G = float(dat["G"])
     M1 = float(dat["M1"])
     M2 = float(dat["M2"])
-    D = float(dat["D"])
     max_radius = float(dat["max_radius"])
 
     n_particles = history_pos.shape[1]
@@ -64,19 +55,10 @@ def main() -> None:
         history_pos = history_pos[:, keep, :]
         escaped_at_step = escaped_at_step[keep]
 
-    w = omega(G, M1, M2, D)
-    history_rot = np.empty_like(history_pos)
-    for idx, time_value in enumerate(history_times):
-        rotation = rotation_matrix(-w * float(time_value))
-        history_rot[idx] = (rotation @ history_pos[idx].T).T
-
-    r1 = D * M2 / (M1 + M2)
-    r2 = D * M1 / (M1 + M2)
-
     fig, ax = plt.subplots(figsize=(6.6, 6.6))
     dust = ax.scatter([], [], s=4, alpha=0.45, color="#1f77b4", edgecolors="none")
-    primaries = ax.scatter([-r1, r2], [0.0, 0.0], marker="x", s=90, color="black")
-    _ = primaries
+    star1 = ax.scatter([], [], s=160, color="#111111", label="M1 = 3")
+    star2 = ax.scatter([], [], s=90, color="#666666", label="M2 = 1")
 
     time_text = ax.text(
         0.03,
@@ -91,30 +73,36 @@ def main() -> None:
     ax.set_xlim(-max_radius, max_radius)
     ax.set_ylim(-max_radius, max_radius)
     ax.set_aspect("equal", adjustable="box")
-    ax.set_title("Dust clearing in the co-rotating frame")
+    ax.set_title("Dust clearing with self-consistent RK4 binary dynamics")
     ax.set_xlabel("x")
     ax.set_ylabel("y")
     ax.grid(True, alpha=0.2)
+    ax.legend(loc="upper right")
 
-    def init() -> tuple[object, object]:
+    def init() -> tuple[object, object, object, object]:
         dust.set_offsets(np.empty((0, 2)))
+        star1.set_offsets(np.empty((0, 2)))
+        star2.set_offsets(np.empty((0, 2)))
         time_text.set_text("")
-        return dust, time_text
+        return dust, star1, star2, time_text
 
-    def update(frame_idx: int) -> tuple[object, object]:
+    def update(frame_idx: int) -> tuple[object, object, object, object]:
         active = (escaped_at_step < 0) | (escaped_at_step > history_steps[frame_idx])
-        points = history_rot[frame_idx][active]
+        points = history_pos[frame_idx][active]
         if len(points) == 0:
             dust.set_offsets(np.empty((0, 2)))
         else:
             dust.set_offsets(points)
+
+        star1.set_offsets(history_star1_pos[frame_idx][None, :])
+        star2.set_offsets(history_star2_pos[frame_idx][None, :])
         time_text.set_text(f"t = {history_times[frame_idx]:.1f}")
-        return dust, time_text
+        return dust, star1, star2, time_text
 
     animation = FuncAnimation(
         fig,
         update,
-        frames=len(history_rot),
+        frames=len(history_pos),
         init_func=init,
         interval=1000 / args.fps,
         blit=True,
