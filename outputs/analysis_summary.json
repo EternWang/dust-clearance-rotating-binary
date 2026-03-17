@@ -1,0 +1,9 @@
+{
+  "overall_survival_fraction": 0.2305,
+  "escaped_fraction": 0.7695,
+  "escaped_particles": 1539,
+  "surviving_particles": 461,
+  "median_escape_time": 4.86,
+  "most_unstable_radius_center": 1.7494070725716613,
+  "minimum_survival_fraction": 0.018867924528301886
+}

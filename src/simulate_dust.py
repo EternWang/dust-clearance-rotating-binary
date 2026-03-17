@@ -1,23 +1,10 @@
-"""Dust clearance simulation in a rotating binary (Sun–Jupiter analogue).
+"""Dust clearance simulation in a rotating binary.
 
-We simulate test particles moving under the gravitational field of two primaries
-(M1=1, M2=3) on a fixed circular orbit of separation D=1, in nondimensional
-units with G=1.
-
-The goal is to visualize *resonance-driven clearing*: certain initial orbital
-radii are unstable and become depleted over time.
-
-Outputs
--------
-- outputs/sim_results.npz : compressed numpy archive containing initial radii,
-  final positions, survival mask, and run parameters.
-
-Usage
------
-python src/simulate_dust.py --n_particles 5000 --steps 4000 --dt 0.02 --seed 42
-
-The defaults are chosen to run quickly on a laptop while still showing
-qualitative resonance gaps.
+This script evolves a swarm of massless test particles in the gravitational
+field of two primaries on a fixed circular orbit. In addition to the final
+particle state, it stores downsampled trajectory snapshots and first-escape
+times so the repository can generate both static diagnostics and a GitHub-
+friendly animation.
 """
 
 from __future__ import annotations
@@ -36,65 +23,58 @@ class Params:
     M2: float = 3.0
     D: float = 1.0
 
-    # numerical settings
+    # Numerical settings.
     dt: float = 0.02
     steps: int = 2000
     n_particles: int = 2000
     seed: int = 42
+    save_every: int = 20
 
-    # initial condition distribution
+    # Initial condition distribution.
     r_min: float = 0.5
     r_max: float = 2.0
     v_noise: float = 0.05
 
-    # escape/collision thresholds
+    # Escape and collision thresholds.
     max_radius: float = 3.0
     softening: float = 0.05
 
 
 def omega(p: Params) -> float:
-    return float(np.sqrt(p.G * (p.M1 + p.M2) / p.D ** 3))
+    return float(np.sqrt(p.G * (p.M1 + p.M2) / p.D**3))
 
 
 def star_positions(t: float, p: Params) -> tuple[np.ndarray, np.ndarray]:
-    """Return (r1, r2) at time t in the inertial frame."""
+    """Return the primary positions at time t in the inertial frame."""
     w = omega(p)
-    # distances from COM
-    r1 = p.D * p.M2 / (p.M1 + p.M2)  # 0.75
-    r2 = p.D * p.M1 / (p.M1 + p.M2)  # 0.25
+    r1 = p.D * p.M2 / (p.M1 + p.M2)
+    r2 = p.D * p.M1 / (p.M1 + p.M2)
 
     c = np.cos(w * t)
     s = np.sin(w * t)
 
-    # Choose counter-clockwise circular motion
     pos1 = np.array([-r1 * c, -r1 * s])
     pos2 = np.array([+r2 * c, +r2 * s])
     return pos1, pos2
 
 
 def acceleration(pos: np.ndarray, t: float, p: Params) -> np.ndarray:
-    """Compute acceleration for all particles at time t.
-
-    pos: (N,2)
-    returns: (N,2)
-    """
+    """Compute accelerations for all particles at time t."""
     s1, s2 = star_positions(t, p)
 
     r1 = s1[None, :] - pos
     r2 = s2[None, :] - pos
 
-    d1 = np.linalg.norm(r1, axis=1)
-    d2 = np.linalg.norm(r2, axis=1)
+    d1 = np.maximum(np.linalg.norm(r1, axis=1), p.softening)
+    d2 = np.maximum(np.linalg.norm(r2, axis=1), p.softening)
 
-    # softening to avoid singularities
-    d1 = np.maximum(d1, p.softening)
-    d2 = np.maximum(d2, p.softening)
-
-    a = p.G * (p.M1 * r1 / d1[:, None] ** 3 + p.M2 * r2 / d2[:, None] ** 3)
-    return a
+    return p.G * (p.M1 * r1 / d1[:, None] ** 3 + p.M2 * r2 / d2[:, None] ** 3)
 
 
-def rk4_step(pos: np.ndarray, vel: np.ndarray, t: float, p: Params) -> tuple[np.ndarray, np.ndarray]:
+def rk4_step(
+    pos: np.ndarray, vel: np.ndarray, t: float, p: Params
+) -> tuple[np.ndarray, np.ndarray]:
+    """Advance every particle by one RK4 step."""
     dt = p.dt
 
     k1v = acceleration(pos, t, p)
@@ -111,21 +91,18 @@ def rk4_step(pos: np.ndarray, vel: np.ndarray, t: float, p: Params) -> tuple[np.
 
     pos_next = pos + (dt / 6.0) * (k1x + 2 * k2x + 2 * k3x + k4x)
     vel_next = vel + (dt / 6.0) * (k1v + 2 * k2v + 2 * k3v + k4v)
-
     return pos_next, vel_next
 
 
 def init_particles(p: Params) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Sample initial radii, phases, and nearly circular orbital speeds."""
     rng = np.random.default_rng(p.seed)
 
     r0 = rng.uniform(p.r_min, p.r_max, p.n_particles)
     theta = rng.uniform(0.0, 2 * np.pi, p.n_particles)
 
-    x = r0 * np.cos(theta)
-    y = r0 * np.sin(theta)
-    pos = np.column_stack([x, y])
+    pos = np.column_stack([r0 * np.cos(theta), r0 * np.sin(theta)])
 
-    # Keplerian speed about total mass at radius r0 (about COM)
     v_kep = np.sqrt(p.G * (p.M1 + p.M2) / r0)
     vx = -v_kep * np.sin(theta) + rng.normal(0.0, p.v_noise, p.n_particles)
     vy = +v_kep * np.cos(theta) + rng.normal(0.0, p.v_noise, p.n_particles)
@@ -135,24 +112,34 @@ def init_particles(p: Params) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
 
 
 def run(p: Params, out_path: Path) -> None:
+    """Run the simulation and write results to a compressed numpy archive."""
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
     r0, pos, vel = init_particles(p)
-
     survived = np.ones(p.n_particles, dtype=bool)
+    escaped_at_step = np.full(p.n_particles, -1, dtype=int)
+
+    history_pos = [pos.copy()]
+    history_times = [0.0]
+    history_steps = [0]
 
     t = 0.0
-    for _ in range(p.steps):
-        pos_next, vel_next = rk4_step(pos, vel, t, p)
+    for step in range(1, p.steps + 1):
+        pos, vel = rk4_step(pos, vel, t, p)
+        t = step * p.dt
 
-        # mark escape
-        radii = np.linalg.norm(pos_next, axis=1)
-        escaped = radii > p.max_radius
-        survived &= ~escaped
+        radii = np.linalg.norm(pos, axis=1)
+        newly_escaped = (escaped_at_step < 0) & (radii > p.max_radius)
+        escaped_at_step[newly_escaped] = step
+        survived[newly_escaped] = False
 
-        # keep integrating everyone for simplicity (masking is optional)
-        pos, vel = pos_next, vel_next
-        t += p.dt
+        should_save = p.save_every > 0 and (
+            step % p.save_every == 0 or step == p.steps
+        )
+        if should_save:
+            history_pos.append(pos.copy())
+            history_times.append(t)
+            history_steps.append(step)
 
     np.savez_compressed(
         out_path,
@@ -160,11 +147,16 @@ def run(p: Params, out_path: Path) -> None:
         final_pos=pos,
         final_vel=vel,
         survived=survived,
+        escaped_at_step=escaped_at_step,
+        history_pos=np.stack(history_pos),
+        history_times=np.array(history_times),
+        history_steps=np.array(history_steps),
         t_end=t,
         dt=p.dt,
         steps=p.steps,
         n_particles=p.n_particles,
         seed=p.seed,
+        save_every=p.save_every,
         M1=p.M1,
         M2=p.M2,
         D=p.D,
@@ -174,14 +166,14 @@ def run(p: Params, out_path: Path) -> None:
 
 
 def parse_args() -> Params:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--n_particles", type=int, default=Params.n_particles)
-    ap.add_argument("--steps", type=int, default=Params.steps)
-    ap.add_argument("--dt", type=float, default=Params.dt)
-    ap.add_argument("--seed", type=int, default=Params.seed)
-    ap.add_argument("--max_radius", type=float, default=Params.max_radius)
-
-    args = ap.parse_args()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--n_particles", type=int, default=Params.n_particles)
+    parser.add_argument("--steps", type=int, default=Params.steps)
+    parser.add_argument("--dt", type=float, default=Params.dt)
+    parser.add_argument("--seed", type=int, default=Params.seed)
+    parser.add_argument("--max_radius", type=float, default=Params.max_radius)
+    parser.add_argument("--save_every", type=int, default=Params.save_every)
+    args = parser.parse_args()
 
     return Params(
         dt=args.dt,
@@ -189,6 +181,7 @@ def parse_args() -> Params:
         n_particles=args.n_particles,
         seed=args.seed,
         max_radius=args.max_radius,
+        save_every=args.save_every,
     )
 
 
