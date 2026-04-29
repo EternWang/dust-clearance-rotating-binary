@@ -7,6 +7,9 @@ This repository is structured as a small simulation-and-analysis codebase rather
 than a report dump: it integrates the binary and dust with RK4, generates the
 raw simulation output, derives binned stability diagnostics, and exports both
 static figures and a GitHub-friendly animation.
+It is also organized as a compact computational replication package: simulation
+parameters, generated arrays, derived CSV/JSON summaries, figures, and report artifacts
+are linked through rerunnable code.
 
 ## What this repository demonstrates
 
@@ -16,6 +19,7 @@ static figures and a GitHub-friendly animation.
 - scientific visualization with **matplotlib**
 - animated result generation for a portfolio-ready **README GIF**
 - a reproducible workflow that connects code, figures, and report artifacts
+- lightweight smoke tests for the numerical setup and derived diagnostics
 
 ## Physical model
 
@@ -125,6 +129,19 @@ python src/make_figures.py
 python src/make_animation.py --max_particles 800 --fps 12 --dpi 110
 ```
 
+If `make` is available:
+
+```bash
+make all
+make animation
+```
+
+Smoke test:
+
+```bash
+python -m unittest discover -s tests
+```
+
 Generated assets are written to:
 
 - `figures/survival_fraction_vs_initial_radius.png`
@@ -166,3 +183,16 @@ project** with clear data products, visual diagnostics, and readable Python.
 The PDF in `report/` is the original course artifact. The GitHub version of the
 project extends that baseline by integrating the binary self-consistently with
 RK4 and by adding analysis products and animation assets for portfolio use.
+
+## Modeling notes
+
+This is a simplified numerical experiment, not a full astrophysical disk model. Dust
+particles are massless tracers; close encounters are softened; gas drag, collisions,
+radiation pressure, and particle-size distributions are outside the scope of the
+repository. The value of the project is the transparent simulation workflow and the
+diagnostic treatment of where particles remain stable or clear out.
+
+## Attribution
+
+Author: Hongyu Wang.  
+Course context: UCSB Physics final project; instructor David Berenstein.
